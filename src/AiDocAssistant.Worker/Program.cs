@@ -1,5 +1,4 @@
 using System;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -10,39 +9,17 @@ using AiDocAssistant.Infrastructure.Parser;
 using AiDocAssistant.Infrastructure.VectorSearch;
 using AiDocAssistant.Infrastructure.Prompts;
 using AiDocAssistant.Infrastructure.FileStorage;
-using AiDocAssistant.Api.Middlewares;
 using AiDocAssistant.Application.Interfaces;
-using AiDocAssistant.Application.UseCases;
 using Microsoft.Extensions.AI;
-using System.Text.Json.Serialization;
+using AiDocAssistant.Worker;
 
-var builder = WebApplication.CreateBuilder(args);
-
-// Controller'ları ve Swagger'ı ekle (Enum değerlerini string olarak döndürmesi için yapılandırıldı)
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    });
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-// CORS Politikası Tanımla (Arayüzün bağımsız portlardan bağlanabilmesi için)
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
-});
+var builder = Host.CreateApplicationBuilder(args);
 
 // Veritabanı sağlayıcı seçimi (PostgreSQL veya Mock)
 var dbSettings = builder.Configuration.GetSection("DatabaseSettings");
 var dbProvider = dbSettings.GetValue<string>("Provider") ?? "Mock";
 
-// PostgreSQL + pgvector DbContext Yapılandırması (EF Core tasarım zamanı araçları için her zaman kayıtlı olmalıdır)
+// PostgreSQL + pgvector DbContext Yapılandırması
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, x => x.UseVector()));
@@ -65,23 +42,8 @@ builder.Services.AddSingleton<IDocumentParser, DocumentParser>();
 builder.Services.AddSingleton<IPromptProvider, FilePromptProvider>();
 builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();
 
-// Arka Plan Worker Servis Kaydı
-// PostgreSQL modunda Worker ayrı bir proses (AiDocAssistant.Worker) olarak çalışır.
-// Ancak Mock modunda, bellek içi statik listeyi paylaşabilmeleri için hosted service'i API içinde ayağa kaldırıyoruz.
-if (!dbProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
-{
-    builder.Services.AddHostedService<AiDocAssistant.Worker.DocumentProcessingWorker>();
-}
-
 builder.Services.AddScoped<IAiChatService, AiChatService>();
 builder.Services.AddScoped<IEmbeddingService, EmbeddingService>();
-
-// Use-Case Kayıtları
-builder.Services.AddScoped<UploadDocumentUseCase>();
-builder.Services.AddScoped<AskDocumentQuestionUseCase>();
-builder.Services.AddScoped<GetDocumentsUseCase>();
-builder.Services.AddScoped<GetDocumentChunksUseCase>();
-builder.Services.AddScoped<DeleteDocumentUseCase>();
 
 // AI Provider Yapılandırması (Ollama veya Mock)
 var aiSettings = builder.Configuration.GetSection("AiSettings");
@@ -106,45 +68,8 @@ else
     builder.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(sp => new MockEmbeddingGenerator());
 }
 
-var app = builder.Build();
+// Worker Servisi Kaydı
+builder.Services.AddHostedService<DocumentProcessingWorker>();
 
-// Global Exception Handler boru hattının en başında çalışmalıdır
-app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
-
-// Veritabanı migrasyonlarını başlangıçta otomatik uygula (Sadece PostgreSQL seçildiğinde)
-if (dbProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
-{
-    using (var scope = app.Services.CreateScope())
-    {
-        var services = scope.ServiceProvider;
-        try
-        {
-            var context = services.GetRequiredService<AppDbContext>();
-            if (context.Database.IsRelational())
-            {
-                context.Database.Migrate();
-            }
-        }
-        catch (Exception ex)
-        {
-            var logger = services.GetRequiredService<ILogger<Program>>();
-            logger.LogError(ex, "Veritabanı migrasyonu sırasında bir hata oluştu.");
-        }
-    }
-}
-
-// HTTP İstek Hattı Yapılandırması
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseHttpsRedirection();
-
-app.UseCors("AllowAll");
-
-app.UseAuthorization();
-app.MapControllers();
-
-app.Run();
+var host = builder.Build();
+host.Run();

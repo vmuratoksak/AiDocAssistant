@@ -4,10 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using AiDocAssistant.Application.Interfaces;
 using AiDocAssistant.Domain.Entities;
+using AiDocAssistant.Domain.Enums;
 using AiDocAssistant.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Pgvector;
-using Pgvector.EntityFrameworkCore; // CosineDistance extension metodu için gerekli
 
 namespace AiDocAssistant.Infrastructure.VectorSearch
 {
@@ -26,36 +25,41 @@ namespace AiDocAssistant.Infrastructure.VectorSearch
             System.Guid? documentId,
             CancellationToken cancellationToken)
         {
-            var queryVector = new Vector(queryEmbedding);
-            var query = _context.DocumentChunks.AsQueryable();
+            var queryVector = new Pgvector.Vector(queryEmbedding);
+            System.Guid targetDocId = System.Guid.Empty;
 
             if (documentId.HasValue)
             {
-                query = query.Where(c => c.DocumentId == documentId.Value);
+                targetDocId = documentId.Value;
             }
             else
             {
                 // Default to the latest completed document if no documentId is specified
-                var latestDocId = await _context.Documents
-                    .Where(d => d.Status == "Completed")
+                targetDocId = await _context.Documents
+                    .Where(d => d.Status == DocumentStatus.Completed)
                     .OrderByDescending(d => d.UploadedAt)
                     .Select(d => d.Id)
                     .FirstOrDefaultAsync(cancellationToken);
-
-                if (latestDocId != System.Guid.Empty)
-                {
-                    query = query.Where(c => c.DocumentId == latestDocId);
-                }
-                else
-                {
-                    query = query.Where(c => _context.Documents.Any(d => d.Id == c.DocumentId && d.Status == "Completed"));
-                }
             }
 
-            var chunks = await query
-                .OrderBy(c => c.Embedding.CosineDistance(queryVector))
-                .Take(topK)
-                .ToListAsync(cancellationToken);
+            List<DocumentChunk> chunks;
+            if (targetDocId != System.Guid.Empty)
+            {
+                // PostgreSQL'de pgvector ile Cosine Similarity araması <=> operatörü ile gerçekleştirilir.
+                // Raw SQL kullanımı, veritabanına özgü Pgvector.Vector nesnesi ve CosineDistance metodunun LINQ ağacında hata vermesini önler.
+                chunks = await _context.DocumentChunks
+                    .FromSqlRaw("SELECT * FROM \"DocumentChunks\" WHERE \"DocumentId\" = {0} ORDER BY \"Embedding\" <=> {1} LIMIT {2}", 
+                        targetDocId, queryVector, topK)
+                    .ToListAsync(cancellationToken);
+            }
+            else
+            {
+                // Henüz işlenmiş tüm dokümanlar içinden benzerlik sorgusu yap
+                chunks = await _context.DocumentChunks
+                    .FromSqlRaw("SELECT c.* FROM \"DocumentChunks\" c INNER JOIN \"Documents\" d ON c.\"DocumentId\" = d.\"Id\" WHERE d.\"Status\" = 'Completed' ORDER BY c.\"Embedding\" <=> {0} LIMIT {1}", 
+                        queryVector, topK)
+                    .ToListAsync(cancellationToken);
+            }
 
             return chunks;
         }

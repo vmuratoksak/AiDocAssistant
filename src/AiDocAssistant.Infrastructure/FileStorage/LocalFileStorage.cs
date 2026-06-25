@@ -12,7 +12,7 @@ namespace AiDocAssistant.Infrastructure.FileStorage
 
         public LocalFileStorage()
         {
-            _storageDirectory = Path.Combine(AppContext.BaseDirectory, "App_Data", "Uploads");
+            _storageDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AiDocAssistant", "Uploads");
             if (!Directory.Exists(_storageDirectory))
             {
                 Directory.CreateDirectory(_storageDirectory);

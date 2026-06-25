@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AiDocAssistant.Infrastructure\AiDocAssistant.Infrastructure.csproj" />
     <ProjectReference Include="..\AiDocAssistant.Application\AiDocAssistant.Application.csproj" />
+    <ProjectReference Include="..\AiDocAssistant.Worker\AiDocAssistant.Worker.csproj" />
   </ItemGroup>
 
   <ItemGroup>

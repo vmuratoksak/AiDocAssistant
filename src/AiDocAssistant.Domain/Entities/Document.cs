@@ -1,18 +1,19 @@
 using System;
 using System.Collections.Generic;
-using Pgvector;
+using AiDocAssistant.Domain.Enums;
 
 namespace AiDocAssistant.Domain.Entities
 {
     public sealed class Document
     {
         public Guid Id { get; private set; }
-        public string FileName { get; private set; }
-        public string ContentType { get; private set; }
+        public string FileName { get; private set; } = null!;
+        public string ContentType { get; private set; } = null!;
         public DateTime UploadedAt { get; private set; }
+        public string? StoragePath { get; private set; }
         
-        // Dokümanın işlenme durumunu temsil eden alan: "Processing", "Completed", "Failed"
-        public string Status { get; private set; } = "Processing";
+        // Dokümanın işlenme durumunu temsil eden alan: Processing, Completed, Failed
+        public DocumentStatus Status { get; private set; } = DocumentStatus.Processing;
         public string? ErrorMessage { get; private set; }
 
         private readonly List<DocumentChunk> _chunks = new();
@@ -20,18 +21,21 @@ namespace AiDocAssistant.Domain.Entities
 
         private Document() { }
 
-        public Document(string fileName, string contentType)
+        public Document(string fileName, string contentType, string storagePath)
         {
             Id = Guid.NewGuid();
             FileName = string.IsNullOrWhiteSpace(fileName)
                 ? throw new ArgumentException("File name is required.")
                 : fileName;
             ContentType = contentType;
+            StoragePath = string.IsNullOrWhiteSpace(storagePath)
+                ? throw new ArgumentException("Storage path is required.")
+                : storagePath;
             UploadedAt = DateTime.UtcNow;
-            Status = "Processing";
+            Status = DocumentStatus.Processing;
         }
 
-        public void AddChunk(string content, int order, Vector embedding)
+        public void AddChunk(string content, int order, float[] embedding)
         {
             if (string.IsNullOrWhiteSpace(content))
                 throw new ArgumentException("Chunk content cannot be empty.");
@@ -39,15 +43,20 @@ namespace AiDocAssistant.Domain.Entities
             _chunks.Add(new DocumentChunk(Id, content, order, embedding));
         }
 
+        public void ClearStoragePath()
+        {
+            StoragePath = null;
+        }
+
         public void MarkAsCompleted()
         {
-            Status = "Completed";
+            Status = DocumentStatus.Completed;
             ErrorMessage = null;
         }
 
         public void MarkAsFailed(string errorMessage)
         {
-            Status = "Failed";
+            Status = DocumentStatus.Failed;
             ErrorMessage = errorMessage;
         }
     }

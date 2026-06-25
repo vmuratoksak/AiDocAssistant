@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AiDocAssistant.Application.Interfaces;
 using AiDocAssistant.Domain.Entities;
+using AiDocAssistant.Domain.Enums;
 
 namespace AiDocAssistant.Infrastructure.VectorSearch
 {
@@ -23,14 +24,14 @@ namespace AiDocAssistant.Infrastructure.VectorSearch
                 {
                     // Default to the latest completed document
                     docId = Persistence.InMemoryDocumentRepository.Documents
-                        .Where(d => d.Status == "Completed")
+                        .Where(d => d.Status == DocumentStatus.Completed)
                         .OrderByDescending(d => d.UploadedAt)
                         .Select(d => d.Id)
                         .FirstOrDefault();
                 }
 
                 var query = Persistence.InMemoryDocumentRepository.Documents
-                    .Where(d => d.Status == "Completed");
+                    .Where(d => d.Status == DocumentStatus.Completed);
 
                 if (docId.HasValue && docId.Value != Guid.Empty)
                 {
@@ -51,7 +52,7 @@ namespace AiDocAssistant.Infrastructure.VectorSearch
                     .Select(chunk => new
                     {
                         Chunk = chunk,
-                        Distance = CalculateCosineDistance(chunk.Embedding.ToArray(), queryEmbedding)
+                        Distance = CalculateCosineDistance(chunk.Embedding, queryEmbedding)
                     })
                     .OrderBy(x => x.Distance)
                     .Take(topK)

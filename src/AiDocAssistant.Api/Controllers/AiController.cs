@@ -25,34 +25,14 @@ namespace AiDocAssistant.Api.Controllers
             if (string.IsNullOrWhiteSpace(request?.Question))
                 return BadRequest("Soru boş olamaz.");
 
-            try
-            {
-                var result = await _askDocumentQuestionUseCase.ExecuteAsync(
-                    request.Question,
-                    request.DocumentId,
-                    cancellationToken);
+            var result = await _askDocumentQuestionUseCase.ExecuteAsync(
+                request.Question,
+                request.DocumentId,
+                cancellationToken);
 
-                return Ok(new AskQuestionResponse(
-                    result.Answer,
-                    result.Sources.Select(s => new QuestionSourceResponse(s.ChunkId, s.Order, s.Content, s.CosineDistance)).ToList()
-                ));
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"AI yanıtı üretilirken hata oluştu: {ex.Message}");
-            }
+            return Ok(result);
         }
     }
 
     public sealed record AskQuestionRequest(string Question, Guid? DocumentId = null);
-    
-    public sealed record AskQuestionResponse(
-        string Answer, 
-        System.Collections.Generic.IReadOnlyList<QuestionSourceResponse> Sources);
-
-    public sealed record QuestionSourceResponse(
-        Guid ChunkId, 
-        int Order, 
-        string Content, 
-        float CosineDistance);
 }

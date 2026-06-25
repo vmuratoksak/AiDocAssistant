@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using AiDocAssistant.Domain.Entities;
+using AiDocAssistant.Domain.Enums;
+using Pgvector;
 
 namespace AiDocAssistant.Infrastructure.Persistence
 {
@@ -13,7 +15,7 @@ namespace AiDocAssistant.Infrastructure.Persistence
             ChangeTracker.Tracked += OnEntityTracked;
         }
 
-        private void OnEntityTracked(object sender, Microsoft.EntityFrameworkCore.ChangeTracking.EntityTrackedEventArgs e)
+        private void OnEntityTracked(object? sender, Microsoft.EntityFrameworkCore.ChangeTracking.EntityTrackedEventArgs e)
         {
             if (!e.FromQuery && e.Entry.Entity is DocumentChunk && e.Entry.State == EntityState.Modified)
             {
@@ -35,7 +37,14 @@ namespace AiDocAssistant.Infrastructure.Persistence
                 entity.Property(e => e.FileName).IsRequired().HasMaxLength(255);
                 entity.Property(e => e.ContentType).HasMaxLength(100);
                 entity.Property(e => e.UploadedAt).IsRequired();
-                entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.StoragePath).HasMaxLength(1000);
+                
+                // Status enum değerini veritabanında string olarak saklıyoruz
+                entity.Property(e => e.Status)
+                      .IsRequired()
+                      .HasMaxLength(50)
+                      .HasConversion<string>();
+                      
                 entity.Property(e => e.ErrorMessage).HasMaxLength(1000);
 
                 // Document -> DocumentChunk ilişkisi (Cascade Delete)
@@ -52,10 +61,14 @@ namespace AiDocAssistant.Infrastructure.Persistence
                 entity.Property(e => e.Content).IsRequired();
                 entity.Property(e => e.Order).IsRequired();
 
-                // Embedding alanını pgvector'ın vector tipine eşliyoruz
-                // Sabit boyut yerine genel "vector" tipi esneklik sağlar
+                // Embedding alanını pgvector'ın vector tipine eşliyoruz ve
+                // float[] ile Pgvector.Vector arasında çift yönlü dönüşüm yapıyoruz
                 entity.Property(e => e.Embedding)
-                      .HasColumnType("vector");
+                      .HasColumnType("vector")
+                      .HasConversion(
+                          v => new Pgvector.Vector(v),
+                          v => v.ToArray()
+                      );
             });
         }
     }

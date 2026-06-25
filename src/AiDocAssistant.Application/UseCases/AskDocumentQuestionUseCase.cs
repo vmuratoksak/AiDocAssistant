@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using AiDocAssistant.Application.DTOs;
 using AiDocAssistant.Application.Interfaces;
 
 namespace AiDocAssistant.Application.UseCases
@@ -23,7 +24,7 @@ namespace AiDocAssistant.Application.UseCases
             _aiChatService = aiChatService;
         }
 
-        public async Task<AskQuestionResult> ExecuteAsync(
+        public async Task<AskQuestionResponseDto> ExecuteAsync(
             string question,
             Guid? documentId,
             CancellationToken cancellationToken)
@@ -43,9 +44,9 @@ namespace AiDocAssistant.Application.UseCases
 
             if (relevantChunks == null || relevantChunks.Count == 0)
             {
-                return new AskQuestionResult(
+                return new AskQuestionResponseDto(
                     "Bu soruya cevap verebilmek için sistemde ilgili doküman içeriği bulunamadı.",
-                    Array.Empty<QuestionSourceResult>());
+                    Array.Empty<QuestionSourceDto>());
             }
 
             // 3. Eşleşen chunk metinlerini topla ve sırala
@@ -60,11 +61,11 @@ namespace AiDocAssistant.Application.UseCases
             // 5. Her parça için cosine distance hesapla
             var sources = relevantChunks.Select(c =>
             {
-                var distance = CalculateCosineDistance(c.Embedding.ToArray(), queryEmbedding);
-                return new QuestionSourceResult(c.Id, c.Order, c.Content, distance);
+                var distance = CalculateCosineDistance(c.Embedding, queryEmbedding);
+                return new QuestionSourceDto(c.Id, c.Order, c.Content, distance);
             }).ToList();
 
-            return new AskQuestionResult(answer, sources);
+            return new AskQuestionResponseDto(answer, sources);
         }
 
         private float CalculateCosineDistance(float[] vectorA, float[] vectorB)
@@ -88,34 +89,6 @@ namespace AiDocAssistant.Application.UseCases
 
             double similarity = dotProduct / (Math.Sqrt(normA) * Math.Sqrt(normB));
             return (float)(1.0 - similarity);
-        }
-    }
-
-    public sealed class AskQuestionResult
-    {
-        public string Answer { get; }
-        public IReadOnlyList<QuestionSourceResult> Sources { get; }
-
-        public AskQuestionResult(string answer, IReadOnlyList<QuestionSourceResult> sources)
-        {
-            Answer = answer;
-            Sources = sources;
-        }
-    }
-
-    public sealed class QuestionSourceResult
-    {
-        public Guid ChunkId { get; }
-        public int Order { get; }
-        public string Content { get; }
-        public float CosineDistance { get; }
-
-        public QuestionSourceResult(Guid chunkId, int order, string content, float cosineDistance)
-        {
-            ChunkId = chunkId;
-            Order = order;
-            Content = content;
-            CosineDistance = cosineDistance;
         }
     }
 }

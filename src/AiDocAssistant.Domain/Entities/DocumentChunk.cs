@@ -1,5 +1,4 @@
 using System;
-using Pgvector;
 
 namespace AiDocAssistant.Domain.Entities
 {
@@ -7,15 +6,15 @@ namespace AiDocAssistant.Domain.Entities
     {
         public Guid Id { get; private set; }
         public Guid DocumentId { get; private set; }
-        public string Content { get; private set; }
+        public string Content { get; private set; } = null!;
         public int Order { get; private set; }
         
-        // C# içindeki Pgvector.Vector tipi, pgvector veritabanındaki vector sütununa doğrudan eşlenir.
-        public Vector Embedding { get; private set; }
+        // Vektör verileri float dizisi olarak saklanır (Altyapı bağımsızlığı için)
+        public float[] Embedding { get; private set; } = null!;
 
         private DocumentChunk() { }
 
-        public DocumentChunk(Guid documentId, string content, int order, Vector embedding)
+        public DocumentChunk(Guid documentId, string content, int order, float[] embedding)
         {
             Id = Guid.NewGuid();
             DocumentId = documentId;
