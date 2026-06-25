@@ -1,10 +1,12 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AiDocAssistant.Application.Interfaces;
 using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 
 namespace AiDocAssistant.Infrastructure.Parser
 {
@@ -59,9 +61,42 @@ namespace AiDocAssistant.Infrastructure.Parser
                 {
                     foreach (var page in document.GetPages())
                     {
-                        var text = page.Text;
-                        if (!string.IsNullOrWhiteSpace(text))
+                        var words = page.GetWords();
+                        if (words != null && words.Any())
                         {
+                            // Sort words primarily top-to-bottom, then left-to-right
+                            var sortedWords = words
+                                .OrderByDescending(w => w.BoundingBox.Bottom)
+                                .ThenBy(w => w.BoundingBox.Left)
+                                .ToList();
+
+                            var linesList = new List<List<Word>>();
+                            foreach (var word in sortedWords)
+                            {
+                                var added = false;
+                                foreach (var line in linesList)
+                                {
+                                    // Check if this word is on the same vertical level (tolerance of 3 points)
+                                    var avgBottom = line.Average(w => w.BoundingBox.Bottom);
+                                    if (Math.Abs(word.BoundingBox.Bottom - avgBottom) <= 3.0)
+                                    {
+                                        line.Add(word);
+                                        added = true;
+                                        break;
+                                    }
+                                }
+                                if (!added)
+                                {
+                                    linesList.Add(new List<Word> { word });
+                                }
+                            }
+
+                            // Order lines top-to-bottom, and words in each line left-to-right
+                            var sortedLines = linesList
+                                .OrderByDescending(line => line.Average(w => w.BoundingBox.Bottom))
+                                .Select(line => string.Join(" ", line.OrderBy(w => w.BoundingBox.Left).Select(w => w.Text)));
+
+                            var text = string.Join(Environment.NewLine, sortedLines);
                             sb.AppendLine(text);
                         }
                     }

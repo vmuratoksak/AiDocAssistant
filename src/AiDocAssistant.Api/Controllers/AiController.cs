@@ -27,11 +27,15 @@ namespace AiDocAssistant.Api.Controllers
 
             try
             {
-                var answer = await _askDocumentQuestionUseCase.ExecuteAsync(
+                var result = await _askDocumentQuestionUseCase.ExecuteAsync(
                     request.Question,
+                    request.DocumentId,
                     cancellationToken);
 
-                return Ok(new AskQuestionResponse(answer));
+                return Ok(new AskQuestionResponse(
+                    result.Answer,
+                    result.Sources.Select(s => new QuestionSourceResponse(s.ChunkId, s.Order, s.Content, s.CosineDistance)).ToList()
+                ));
             }
             catch (Exception ex)
             {
@@ -40,6 +44,15 @@ namespace AiDocAssistant.Api.Controllers
         }
     }
 
-    public sealed record AskQuestionRequest(string Question);
-    public sealed record AskQuestionResponse(string Answer);
+    public sealed record AskQuestionRequest(string Question, Guid? DocumentId = null);
+    
+    public sealed record AskQuestionResponse(
+        string Answer, 
+        System.Collections.Generic.IReadOnlyList<QuestionSourceResponse> Sources);
+
+    public sealed record QuestionSourceResponse(
+        Guid ChunkId, 
+        int Order, 
+        string Content, 
+        float CosineDistance);
 }

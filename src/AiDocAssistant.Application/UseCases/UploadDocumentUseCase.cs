@@ -3,28 +3,25 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using AiDocAssistant.Application.Interfaces;
+using AiDocAssistant.Application.Models;
 using AiDocAssistant.Domain.Entities;
-using Pgvector;
 
 namespace AiDocAssistant.Application.UseCases
 {
     public sealed class UploadDocumentUseCase
     {
-        private readonly IDocumentParser _documentParser;
-        private readonly ITextChunker _textChunker;
-        private readonly IEmbeddingService _embeddingService;
+        private readonly IFileStorage _fileStorage;
         private readonly IDocumentRepository _documentRepository;
+        private readonly IDocumentQueue _documentQueue;
 
         public UploadDocumentUseCase(
-            IDocumentParser documentParser,
-            ITextChunker textChunker,
-            IEmbeddingService embeddingService,
-            IDocumentRepository documentRepository)
+            IFileStorage fileStorage,
+            IDocumentRepository documentRepository,
+            IDocumentQueue documentQueue)
         {
-            _documentParser = documentParser;
-            _textChunker = textChunker;
-            _embeddingService = embeddingService;
+            _fileStorage = fileStorage;
             _documentRepository = documentRepository;
+            _documentQueue = documentQueue;
         }
 
         public async Task<Guid> ExecuteAsync(
@@ -34,32 +31,21 @@ namespace AiDocAssistant.Application.UseCases
             CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(fileName))
-                throw new ArgumentException("File name is required.");
+                throw new ArgumentException("Dosya adı gereklidir.", nameof(fileName));
             if (fileStream == null || fileStream.Length == 0)
-                throw new ArgumentException("File stream is empty.");
+                throw new ArgumentException("Dosya içeriği boş olamaz.", nameof(fileStream));
 
-            // 1. Dokümandan metin çıkartma
-            var text = await _documentParser.ExtractTextAsync(fileStream, cancellationToken);
-            if (string.IsNullOrWhiteSpace(text))
-                throw new InvalidOperationException("No text could be extracted from the document.");
+            // 1. Dosyayı geçici disk depolamasına kaydet
+            var tempFilePath = await _fileStorage.SaveFileAsync(fileName, fileStream, cancellationToken);
 
-            // 2. Metni üst üste binen chunk'lara ayırma (max 1000 karakter, 200 overlap)
-            var chunks = _textChunker.Split(text, maxChunkSize: 1000, overlapSize: 200);
-
-            // 3. Document entity'sini oluşturma
+            // 2. Veritabanında ilk "Processing" (İşleniyor) durumundaki kaydı oluştur
             var document = new Document(fileName, contentType);
-
-            // 4. Her chunk için embedding üretip document'a ekleme
-            for (int i = 0; i < chunks.Count; i++)
-            {
-                var chunkContent = chunks[i];
-                var embedding = await _embeddingService.GenerateEmbeddingAsync(chunkContent, cancellationToken);
-                document.AddChunk(chunkContent, order: i + 1, embedding: new Vector(embedding));
-            }
-
-            // 5. Veritabanına kaydetme
             await _documentRepository.AddAsync(document, cancellationToken);
             await _documentRepository.SaveChangesAsync(cancellationToken);
+
+            // 3. İş parçacığını arka plan işçisine göndermek üzere kuyruğa ekle
+            var queueItem = new DocumentQueueItem(document.Id, tempFilePath, fileName, contentType);
+            await _documentQueue.EnqueueAsync(queueItem);
 
             return document.Id;
         }

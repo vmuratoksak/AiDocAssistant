@@ -10,6 +10,7 @@ namespace AiDocAssistant.Application.Interfaces
         Task<IReadOnlyList<DocumentChunk>> SearchRelevantChunksAsync(
             float[] queryEmbedding,
             int topK,
+            System.Guid? documentId,
             CancellationToken cancellationToken);
     }
 }

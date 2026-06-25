@@ -9,10 +9,12 @@ namespace AiDocAssistant.Infrastructure.AI
     public sealed class AiChatService : IAiChatService
     {
         private readonly IChatClient _chatClient;
+        private readonly IPromptProvider _promptProvider;
 
-        public AiChatService(IChatClient chatClient)
+        public AiChatService(IChatClient chatClient, IPromptProvider promptProvider)
         {
             _chatClient = chatClient;
+            _promptProvider = promptProvider;
         }
 
         public async Task<string> AskAsync(
@@ -22,20 +24,11 @@ namespace AiDocAssistant.Infrastructure.AI
         {
             var context = string.Join("\n\n---\n\n", contextChunks);
 
-            var prompt = $"""
-            Sen kurumsal dokümanlara göre cevap veren bir asistansın.
+            // Harici prompt dosyasını dinamik olarak yüklüyoruz
+            var promptTemplate = await _promptProvider.GetPromptAsync("document-qa");
 
-            Kurallar:
-            - Sadece verilen bağlama göre cevap ver.
-            - Emin değilsen "Bu bilgi verilen dokümanda yok" de.
-            - Cevabı kısa, net ve profesyonel yaz.
-
-            Bağlam:
-            {context}
-
-            Soru:
-            {question}
-            """;
+            // Şablonu bağlam (context) ve soru ile biçimlendiriyoruz
+            var prompt = string.Format(promptTemplate, context, question);
 
             var response = await _chatClient.GetResponseAsync(
                 prompt,

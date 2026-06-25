@@ -1,0 +1,181 @@
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Destekli Doküman Asistanı</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/style.css" asp-append-version="true">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- HEADER / NAVIGATION -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <h1>AiDocAssistant</h1>
+                    <span>Vektör & RAG Platformu</span>
+                </div>
+            </div>
+            <div class="api-status">
+                <span class="status-indicator online"></span>
+                <span>Sunucu Aktif</span>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT -->
+        <main class="app-main">
+            
+            <!-- LEFT PANEL: DOCUMENT MANAGEMENT -->
+            <section class="panel panel-left" id="panel-documents">
+                <div class="panel-header">
+                    <h2>Doküman Yönetimi</h2>
+                    <p>PDF yükleyin ve vektörleştirin</p>
+                </div>
+                
+                <!-- Upload Box -->
+                <div class="upload-zone" id="upload-zone">
+                    <input type="file" id="file-input" accept=".pdf,.txt" style="display: none;">
+                    <div class="upload-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    <p class="upload-title">Sürükle ve Bırak veya Seç</p>
+                    <p class="upload-subtitle">PDF ya da TXT (Maks 15MB)</p>
+                    
+                    <!-- Progress Bar -->
+                    <div class="upload-progress" id="upload-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <span class="progress-text" id="progress-text">Yükleniyor...</span>
+                    </div>
+                </div>
+
+                <!-- Document List Section -->
+                <div class="doc-list-container">
+                    <div class="section-title">
+                        <h3>Kütüphaneniz</h3>
+                        <button class="btn-icon" id="btn-refresh-docs" title="Listeyi Yenile">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="doc-list" id="doc-list">
+                        <!-- Loading State -->
+                        <div class="list-empty">Dokümanlar yükleniyor...</div>
+                    </div>
+                    <!-- Pagination Controls -->
+                    <div class="pagination-controls" id="doc-pagination" style="display: none;">
+                        <button class="btn-pagination" id="btn-prev-page" title="Önceki Sayfa">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                        </button>
+                        <span id="page-indicator">Sayfa 1 / 1</span>
+                        <button class="btn-pagination" id="btn-next-page" title="Sonraki Sayfa">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CENTER PANEL: CHAT INTERFACE -->
+            <section class="panel panel-center" id="panel-chat">
+                <div class="chat-header">
+                    <div class="chat-doc-info">
+                        <span class="chat-doc-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </span>
+                        <div class="chat-doc-meta">
+                            <h3 id="current-doc-title">Tüm Dokümanlar</h3>
+                            <span id="current-doc-status">Küresel RAG Modu (En Son Belge)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Messages Container -->
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message system">
+                        <div class="message-content">
+                            <p>Merhaba! Yüklediğiniz dokümanlarla ilgili soruları yanıtlamaya hazırım. Sol taraftan bir doküman seçebilir veya doğrudan soru sorarak en son yüklenen dokümanı temel alabilirsiniz.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Zone -->
+                <div class="chat-input-container">
+                    <form id="chat-form">
+                        <input type="text" id="chat-input" placeholder="Dokümana bir soru sorun..." autocomplete="off">
+                        <button type="submit" class="btn-send" id="btn-send">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: DB CHUNK INSPECTOR -->
+            <section class="panel panel-right" id="panel-inspector">
+                <div class="panel-header">
+                    <h2>Veritabanı Denetleyicisi</h2>
+                    <p>pgvector içindeki ham metin parçaları</p>
+                </div>
+                
+                <div class="inspector-summary">
+                    <div class="summary-card">
+                        <span class="card-label">Toplam Parça</span>
+                        <span class="card-value" id="inspect-total-chunks">0</span>
+                    </div>
+                    <div class="summary-card">
+                        <span class="card-label">Vektör Boyutu</span>
+                        <span class="card-value">768d</span>
+                    </div>
+                </div>
+
+                <!-- Chunks List -->
+                <div class="chunks-container">
+                    <div class="section-title">
+                        <h3>Metin & Vektör Hücreleri</h3>
+                    </div>
+                    <div class="chunks-list" id="chunks-list">
+                        <div class="list-empty">Lütfen sağ tarafta ham parçalarını görmek istediğiniz dokümanı seçin.</div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+    
+    <script src="~/app.js" asp-append-version="true"></script>
+</body>
+</html>

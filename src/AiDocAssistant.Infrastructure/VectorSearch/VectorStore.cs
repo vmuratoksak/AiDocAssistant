@@ -23,12 +23,36 @@ namespace AiDocAssistant.Infrastructure.VectorSearch
         public async Task<IReadOnlyList<DocumentChunk>> SearchRelevantChunksAsync(
             float[] queryEmbedding,
             int topK,
+            System.Guid? documentId,
             CancellationToken cancellationToken)
         {
-            // pgvector CosineDistance metodu ile cosine mesafesini hesaplayıp en yakınları OrderBy ile küçükten büyüğe sıralar.
-            // float[] tipi için Pgvector.EntityFrameworkCore içindeki CosineDistance uzantı metodu kullanılır.
             var queryVector = new Vector(queryEmbedding);
-            var chunks = await _context.DocumentChunks
+            var query = _context.DocumentChunks.AsQueryable();
+
+            if (documentId.HasValue)
+            {
+                query = query.Where(c => c.DocumentId == documentId.Value);
+            }
+            else
+            {
+                // Default to the latest completed document if no documentId is specified
+                var latestDocId = await _context.Documents
+                    .Where(d => d.Status == "Completed")
+                    .OrderByDescending(d => d.UploadedAt)
+                    .Select(d => d.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (latestDocId != System.Guid.Empty)
+                {
+                    query = query.Where(c => c.DocumentId == latestDocId);
+                }
+                else
+                {
+                    query = query.Where(c => _context.Documents.Any(d => d.Id == c.DocumentId && d.Status == "Completed"));
+                }
+            }
+
+            var chunks = await query
                 .OrderBy(c => c.Embedding.CosineDistance(queryVector))
                 .Take(topK)
                 .ToListAsync(cancellationToken);

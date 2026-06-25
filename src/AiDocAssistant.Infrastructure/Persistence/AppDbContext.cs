@@ -10,6 +10,15 @@ namespace AiDocAssistant.Infrastructure.Persistence
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
+            ChangeTracker.Tracked += OnEntityTracked;
+        }
+
+        private void OnEntityTracked(object sender, Microsoft.EntityFrameworkCore.ChangeTracking.EntityTrackedEventArgs e)
+        {
+            if (!e.FromQuery && e.Entry.Entity is DocumentChunk && e.Entry.State == EntityState.Modified)
+            {
+                e.Entry.State = EntityState.Added;
+            }
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -26,6 +35,8 @@ namespace AiDocAssistant.Infrastructure.Persistence
                 entity.Property(e => e.FileName).IsRequired().HasMaxLength(255);
                 entity.Property(e => e.ContentType).HasMaxLength(100);
                 entity.Property(e => e.UploadedAt).IsRequired();
+                entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.ErrorMessage).HasMaxLength(1000);
 
                 // Document -> DocumentChunk ilişkisi (Cascade Delete)
                 entity.HasMany(e => e.Chunks)

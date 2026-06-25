@@ -20,4 +20,10 @@
     <ProjectReference Include="..\AiDocAssistant.Application\AiDocAssistant.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Prompts\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
